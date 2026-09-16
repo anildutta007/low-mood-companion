@@ -44,7 +44,7 @@ SUGGESTED_ACTIONS: ["breathing", "walk", "music", "water", "reach-out", or "jour
         'content-type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'claude-3-sonnet-20240229',
+        model: 'claude-3-5-haiku-20241022',
         max_tokens: 500,
         system: SYSTEM_PROMPT,
         messages: [{ role: 'user', content: message }]
