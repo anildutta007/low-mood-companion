@@ -41,7 +41,9 @@ export default function ConversationInterface() {
   const [loading, setLoading] = useState(false)
   const [audioEnabled, setAudioEnabled] = useState(true)
   const [suggestedActions, setSuggestedActions] = useState([])
+  const [audioPlaying, setAudioPlaying] = useState(false)
   const messagesEndRef = useRef(null)
+  const audioRef = useRef(null)
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
