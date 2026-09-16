@@ -1,31 +1,9 @@
-const CLAUDE_API_KEY = process.env.CLAUDE_API_KEY
-const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY
-const ELEVENLABS_VOICE_ID = 'EXAVITQu4vr4xnSDxMaL' // Sarah's voice ID
-
-const SYSTEM_PROMPT = `You are a compassionate AI companion helping someone through a moment of low mood. Your role is to:
-
-1. Listen with genuine care and empathy
-2. Help them feel less alone and understood
-3. Ask clarifying questions to understand what they're experiencing
-4. Respond with warmth and encouragement
-5. Suggest 2-3 specific, actionable things they could try right now
-
-Keep your responses brief (2-3 sentences) so the conversation feels natural. Be genuine, not overly cheerful. If they mention crisis thoughts (suicide, self-harm), gently encourage them to reach out to professional support and provide crisis numbers.
-
-End your response with a JSON block like this:
-SUGGESTED_ACTIONS: ["breathing", "walk", "music"]
-
-Choose from: breathing, walk, music, water, reach-out, journal`
-
 export default async function handler(req, res) {
   // Enable CORS
   res.setHeader('Access-Control-Allow-Credentials', 'true')
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT')
-  res.setHeader(
-    'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
-  )
+  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version')
 
   if (req.method === 'OPTIONS') {
     res.status(200).end()
@@ -43,90 +21,86 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Message required' })
     }
 
-    // Call Claude API for conversation
-    const claudeResponse = await fetch(
-      'https://api.anthropic.com/v1/messages',
-      {
-        method: 'POST',
-        headers: {
-          'x-api-key': CLAUDE_API_KEY,
-          'anthropic-version': '2023-06-01',
-          'content-type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: 'claude-3-5-sonnet-20241022',
-          max_tokens: 500,
-          system: SYSTEM_PROMPT,
-          messages: [
-            {
-              role: 'user',
-              content: message
-            }
-          ]
-        })
-      }
-    )
+    const CLAUDE_API_KEY = process.env.CLAUDE_API_KEY
+    const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY
+
+    if (!CLAUDE_API_KEY || !ELEVENLABS_API_KEY) {
+      return res.status(500).json({
+        error: 'API keys not configured',
+        hasClaudeKey: !!CLAUDE_API_KEY,
+        hasElevenKey: !!ELEVENLABS_API_KEY
+      })
+    }
+
+    const SYSTEM_PROMPT = `You are a compassionate AI companion. Respond briefly (2-3 sentences). Suggest actions using:
+SUGGESTED_ACTIONS: ["breathing", "walk", "music", "water", "reach-out", or "journal"]`
+
+    // Call Claude API
+    const claudeResponse = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': CLAUDE_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'claude-3-5-sonnet-20241022',
+        max_tokens: 500,
+        system: SYSTEM_PROMPT,
+        messages: [{ role: 'user', content: message }]
+      })
+    })
 
     if (!claudeResponse.ok) {
-      throw new Error(`Claude API error: ${claudeResponse.status} ${claudeResponse.statusText}`)
+      const errorText = await claudeResponse.text()
+      throw new Error(`Claude API error: ${claudeResponse.status} - ${errorText}`)
     }
 
     const claudeData = await claudeResponse.json()
     const aiResponse = claudeData.content[0].text
 
-    // Extract suggested actions from the response
+    // Extract suggested actions
     const actionsMatch = aiResponse.match(/SUGGESTED_ACTIONS:\s*\[(.*?)\]/)
-    const suggestedActionsStr = actionsMatch ? actionsMatch[1] : ''
-    const suggestedActions = suggestedActionsStr
-      .split(',')
-      .map(s => s.trim().replace(/['"]/g, ''))
-      .filter(s => s.length > 0)
+    const suggestedActions = actionsMatch
+      ? actionsMatch[1].split(',').map(s => s.trim().replace(/['"]/g, '')).filter(s => s.length > 0)
+      : []
 
-    // Remove the JSON block from the response text
     const cleanResponse = aiResponse.replace(/SUGGESTED_ACTIONS:.*?\]/s, '').trim()
 
     let audioUrl = null
 
-    // Generate audio using ElevenLabs if enabled
     if (audioEnabled) {
       try {
-        const elevenlabsResponse = await fetch(
-          `https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}`,
-          {
-            method: 'POST',
-            headers: {
-              'xi-api-key': ELEVENLABS_API_KEY,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              text: cleanResponse,
-              model_id: 'eleven_monolingual_v1',
-              voice_settings: {
-                stability: 0.5,
-                similarity_boost: 0.75
-              }
-            })
-          }
-        )
+        const elevenResponse = await fetch('https://api.elevenlabs.io/v1/text-to-speech/EXAVITQu4vr4xnSDxMaL', {
+          method: 'POST',
+          headers: {
+            'xi-api-key': ELEVENLABS_API_KEY,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            text: cleanResponse,
+            model_id: 'eleven_monolingual_v1',
+            voice_settings: { stability: 0.5, similarity_boost: 0.75 }
+          })
+        })
 
-        if (elevenlabsResponse.ok) {
-          const audioBuffer = await elevenlabsResponse.arrayBuffer()
+        if (elevenResponse.ok) {
+          const audioBuffer = await elevenResponse.arrayBuffer()
           const base64Audio = Buffer.from(audioBuffer).toString('base64')
           audioUrl = `data:audio/mp3;base64,${base64Audio}`
         }
-      } catch (audioError) {
-        console.error('ElevenLabs error:', audioError.message)
-        // Continue without audio if TTS fails
+      } catch (e) {
+        console.error('Audio error:', e.message)
       }
     }
 
     res.status(200).json({
       response: cleanResponse,
-      audioUrl: audioUrl,
-      suggestedActions: suggestedActions
+      audioUrl,
+      suggestedActions
     })
   } catch (error) {
-    console.error('API Error:', error.message)
+    console.error('API Error:', error)
     res.status(500).json({
       error: 'Failed to process request',
       message: error.message
