@@ -11,11 +11,11 @@ const ACTIONS = [
 ]
 
 const RESPONSES = {
-  anxiety: "It's understandable to feel anxious. What you're experiencing is real, and taking small steps can help. Try grounding yourself in the present moment.",
+  anxiety: "It's understandable to feel anxious. What you're experiencing is real, and taking small steps can help. Try the 4-7-8 breathing technique: breathe in for 4 counts, hold for 7, exhale for 8. I can show you a video guide.",
   overwhelmed: "Feeling overwhelmed means you're caring deeply about things. Breaking tasks into smaller steps often helps. You don't have to do everything at once.",
   sad: "Sadness is a part of life, and it's okay to feel it. Sometimes the smallest actions—like getting outside or connecting with someone—can shift your mood.",
   depressed: "What you're feeling is valid. Even small actions matter. Moving your body, getting sunlight, or talking to someone can help more than you realize.",
-  stressed: "Stress tells us we care. Taking a pause—whether through breathing, a short walk, or talking to someone—can ease what you're carrying.",
+  stressed: "Stress tells us we care. Taking a pause—whether through breathing, a short walk, or talking to someone—can ease what you're carrying. Try the breathing exercise for instant calm.",
   lonely: "Loneliness is painful, but you don't have to carry it alone. Reaching out to one person, even briefly, can remind you that you matter.",
   tired: "Exhaustion is your body asking for rest. Be gentle with yourself. Sometimes the best action is to rest, move gently, or do something that brings you peace.",
   default: "I hear you. What you're feeling matters. Small actions can shift how you feel—try one of the suggestions that resonates with you."
@@ -74,6 +74,13 @@ export default function ConversationInterface() {
 
   const handleActionClick = (action) => {
     setMessages(prev => [...prev, { role: 'user', content: `I'm going to try: ${action.title}`, isAction: true }])
+
+    if (action.id === 'breathing') {
+      setTimeout(() => {
+        const breathingVideo = 'https://www.youtube.com/watch?v=tybOi4hjZFY'
+        window.open(breathingVideo, '_blank')
+      }, 500)
+    }
   }
 
   return (
