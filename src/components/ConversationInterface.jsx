@@ -1,61 +1,47 @@
 import { useState, useRef, useEffect } from 'react'
-import axios from 'axios'
 import '../styles/ConversationInterface.css'
 
 const ACTIONS = [
-  {
-    id: 'breathing',
-    title: '🫁 Breathing Exercise',
-    description: 'Calm your nervous system with guided 4-7-8 breathing',
-    icon: '🫁'
-  },
-  {
-    id: 'walk',
-    title: '🚶 Take a Walk',
-    description: 'Move your body outside for 5-10 minutes',
-    icon: '🚶'
-  },
-  {
-    id: 'music',
-    title: '🎵 Listen to Music',
-    description: 'Play your favorite uplifting song',
-    icon: '🎵'
-  },
-  {
-    id: 'water',
-    title: '💧 Hydrate & Stretch',
-    description: 'Drink water and do gentle stretches',
-    icon: '💧'
-  },
-  {
-    id: 'reach-out',
-    title: '📞 Reach Out to Someone',
-    description: 'Text or call someone you trust',
-    icon: '📞'
-  },
-  {
-    id: 'journal',
-    title: '📝 Write It Down',
-    description: 'Journal about what you\'re feeling',
-    icon: '📝'
-  }
+  { id: 'breathing', title: '🫁 Breathing Exercise', description: 'Calm your nervous system with guided 4-7-8 breathing', icon: '🫁' },
+  { id: 'walk', title: '🚶 Take a Walk', description: 'Move your body outside for 5-10 minutes', icon: '🚶' },
+  { id: 'music', title: '🎵 Listen to Music', description: 'Play your favorite uplifting song', icon: '🎵' },
+  { id: 'water', title: '💧 Hydrate & Stretch', description: 'Drink water and do gentle stretches', icon: '💧' },
+  { id: 'reach-out', title: '📞 Reach Out to Someone', description: 'Text or call someone you trust', icon: '📞' },
+  { id: 'journal', title: '📝 Write It Down', description: 'Journal about what you\'re feeling', icon: '📝' }
 ]
+
+const RESPONSES = {
+  anxiety: "It's understandable to feel anxious. What you're experiencing is real, and taking small steps can help. Try grounding yourself in the present moment.",
+  overwhelmed: "Feeling overwhelmed means you're caring deeply about things. Breaking tasks into smaller steps often helps. You don't have to do everything at once.",
+  sad: "Sadness is a part of life, and it's okay to feel it. Sometimes the smallest actions—like getting outside or connecting with someone—can shift your mood.",
+  depressed: "What you're feeling is valid. Even small actions matter. Moving your body, getting sunlight, or talking to someone can help more than you realize.",
+  stressed: "Stress tells us we care. Taking a pause—whether through breathing, a short walk, or talking to someone—can ease what you're carrying.",
+  lonely: "Loneliness is painful, but you don't have to carry it alone. Reaching out to one person, even briefly, can remind you that you matter.",
+  tired: "Exhaustion is your body asking for rest. Be gentle with yourself. Sometimes the best action is to rest, move gently, or do something that brings you peace.",
+  default: "I hear you. What you're feeling matters. Small actions can shift how you feel—try one of the suggestions that resonates with you."
+}
+
+function getResponse(userMessage) {
+  const msg = userMessage.toLowerCase()
+  if (msg.includes('anxious') || msg.includes('anxiety') || msg.includes('nervous') || msg.includes('panic')) return RESPONSES.anxiety
+  if (msg.includes('overwhelm') || msg.includes('too much')) return RESPONSES.overwhelmed
+  if (msg.includes('sad') || msg.includes('depressed') || msg.includes('sad')) return RESPONSES.sad
+  if (msg.includes('depress')) return RESPONSES.depressed
+  if (msg.includes('stress') || msg.includes('worried') || msg.includes('worry')) return RESPONSES.stressed
+  if (msg.includes('lonely') || msg.includes('alone') || msg.includes('isolated')) return RESPONSES.lonely
+  if (msg.includes('tired') || msg.includes('exhausted') || msg.includes('fatigue')) return RESPONSES.tired
+  return RESPONSES.default
+}
 
 export default function ConversationInterface() {
   const [messages, setMessages] = useState([
-    {
-      role: 'assistant',
-      content: 'Hi, I\'m here to listen and help. What\'s on your mind right now?',
-      isInitial: true
-    }
+    { role: 'assistant', content: 'Hi, I\'m here to listen and help. What\'s on your mind right now?', isInitial: true }
   ])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [audioEnabled, setAudioEnabled] = useState(true)
-  const [audioPlaying, setAudioPlaying] = useState(false)
   const [suggestedActions, setSuggestedActions] = useState([])
   const messagesEndRef = useRef(null)
-  const audioRef = useRef(null)
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -65,73 +51,27 @@ export default function ConversationInterface() {
     scrollToBottom()
   }, [messages])
 
-  const callAPI = async (userMessage) => {
-    try {
-      const response = await axios.post('/api/chat', {
-        message: userMessage,
-        audioEnabled: audioEnabled
-      })
-
-      return {
-        text: response.data.response,
-        audioUrl: response.data.audioUrl,
-        suggestedActions: response.data.suggestedActions || []
-      }
-    } catch (error) {
-      console.error('API Error:', error)
-      return {
-        text: 'Sorry, I encountered an error. Please try again.',
-        audioUrl: null,
-        suggestedActions: []
-      }
-    }
-  }
-
-  const handleSendMessage = async (e) => {
+  const handleSendMessage = (e) => {
     e.preventDefault()
     if (!input.trim()) return
 
     const userMessage = input.trim()
     setInput('')
 
-    setMessages(prev => [...prev, {
-      role: 'user',
-      content: userMessage
-    }])
-
+    setMessages(prev => [...prev, { role: 'user', content: userMessage }])
     setLoading(true)
 
-    const result = await callAPI(userMessage)
-
-    setMessages(prev => [...prev, {
-      role: 'assistant',
-      content: result.text,
-      audioUrl: result.audioUrl
-    }])
-
-    setSuggestedActions(result.suggestedActions || ACTIONS.slice(0, 3))
-
-    if (audioEnabled && result.audioUrl) {
-      playAudio(result.audioUrl)
-    }
-
-    setLoading(false)
-  }
-
-  const playAudio = (audioUrl) => {
-    if (audioRef.current) {
-      audioRef.current.src = audioUrl
-      audioRef.current.play()
-      setAudioPlaying(true)
-    }
+    // Simulate response delay
+    setTimeout(() => {
+      const response = getResponse(userMessage)
+      setMessages(prev => [...prev, { role: 'assistant', content: response }])
+      setSuggestedActions(ACTIONS.slice(0, 3))
+      setLoading(false)
+    }, 1000)
   }
 
   const handleActionClick = (action) => {
-    setMessages(prev => [...prev, {
-      role: 'user',
-      content: `I'm going to try: ${action.title}`,
-      isAction: true
-    }])
+    setMessages(prev => [...prev, { role: 'user', content: `I'm going to try: ${action.title}`, isAction: true }])
   }
 
   return (
