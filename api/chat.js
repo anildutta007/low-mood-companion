@@ -1,5 +1,3 @@
-import axios from 'axios'
-
 const CLAUDE_API_KEY = process.env.CLAUDE_API_KEY
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY
 const ELEVENLABS_VOICE_ID = 'EXAVITQu4vr4xnSDxMaL' // Sarah's voice ID
@@ -46,28 +44,35 @@ export default async function handler(req, res) {
     }
 
     // Call Claude API for conversation
-    const claudeResponse = await axios.post(
+    const claudeResponse = await fetch(
       'https://api.anthropic.com/v1/messages',
       {
-        model: 'claude-3-5-sonnet-20241022',
-        max_tokens: 500,
-        system: SYSTEM_PROMPT,
-        messages: [
-          {
-            role: 'user',
-            content: message
-          }
-        ]
-      },
-      {
+        method: 'POST',
         headers: {
           'x-api-key': CLAUDE_API_KEY,
-          'anthropic-version': '2023-06-01'
-        }
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'claude-3-5-sonnet-20241022',
+          max_tokens: 500,
+          system: SYSTEM_PROMPT,
+          messages: [
+            {
+              role: 'user',
+              content: message
+            }
+          ]
+        })
       }
     )
 
-    const aiResponse = claudeResponse.data.content[0].text
+    if (!claudeResponse.ok) {
+      throw new Error(`Claude API error: ${claudeResponse.status} ${claudeResponse.statusText}`)
+    }
+
+    const claudeData = await claudeResponse.json()
+    const aiResponse = claudeData.content[0].text
 
     // Extract suggested actions from the response
     const actionsMatch = aiResponse.match(/SUGGESTED_ACTIONS:\s*\[(.*?)\]/)
@@ -85,28 +90,30 @@ export default async function handler(req, res) {
     // Generate audio using ElevenLabs if enabled
     if (audioEnabled) {
       try {
-        const elevenlabsResponse = await axios.post(
+        const elevenlabsResponse = await fetch(
           `https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}`,
           {
-            text: cleanResponse,
-            model_id: 'eleven_monolingual_v1',
-            voice_settings: {
-              stability: 0.5,
-              similarity_boost: 0.75
-            }
-          },
-          {
+            method: 'POST',
             headers: {
               'xi-api-key': ELEVENLABS_API_KEY,
               'Content-Type': 'application/json'
             },
-            responseType: 'arraybuffer'
+            body: JSON.stringify({
+              text: cleanResponse,
+              model_id: 'eleven_monolingual_v1',
+              voice_settings: {
+                stability: 0.5,
+                similarity_boost: 0.75
+              }
+            })
           }
         )
 
-        // Convert audio buffer to base64 for client
-        const audioBuffer = Buffer.from(elevenlabsResponse.data, 'binary')
-        audioUrl = `data:audio/mp3;base64,${audioBuffer.toString('base64')}`
+        if (elevenlabsResponse.ok) {
+          const audioBuffer = await elevenlabsResponse.arrayBuffer()
+          const base64Audio = Buffer.from(audioBuffer).toString('base64')
+          audioUrl = `data:audio/mp3;base64,${base64Audio}`
+        }
       } catch (audioError) {
         console.error('ElevenLabs error:', audioError.message)
         // Continue without audio if TTS fails
